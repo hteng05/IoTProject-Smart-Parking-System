@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --tertiary-color: #e67e22;
+            --danger-color: #e74c3c;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --gray-color: #95a5a6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: var(--dark-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo i {
+            font-size: 2rem;
+            color: var(--primary-color);
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 50px;
+            background-color: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+        }
+        
+        .indicator i {
+            font-size: 0.8rem;
+        }
+        
+        .indicator.online {
+            color: var(--secondary-color);
+        }
+        
+        .indicator.offline {
+            color: var(--danger-color);
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            background-color: var(--dark-color);
+            color: white;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header .title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-header i {
+            color: var(--primary-color);
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .slot-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .slot {
+            border: 2px solid var(--light-color);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .slot.free {
+            border-color: var(--secondary-color);
+        }
+        
+        .slot.occupied {
+            border-color: var(--danger-color);
+        }
+        
+        .slot.booked {
+            border-color: var(--tertiary-color);
+        }
+        
+        .slot-number {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 0 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .free .slot-number {
+            color: var(--secondary-color);
+        }
+        
+        .occupied .slot-number {
+            color: var(--danger-color);
+        }
+        
+        .booked .slot-number {
+            color: var(--tertiary-color);
+        }
+        
+        .slot-status {
+            margin-top: 10px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .slot-plate {
+            margin-top: 10px;
+            font-style: italic;
+            color: var(--gray-color);
+        }
+        
+        .controls {
+            margin-top: 15px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+        
+        .btn-success {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-warning {
+            background-color: var(--tertiary-color);
+        }
+        
+        .btn-warning:hover {
+            background-color: #d35400;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .gate-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .gate-indicator {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .gate-closed {
+            background-color: var(--danger-color);
+        }
+        
+        .gate-open {
+            background-color: var(--secondary-color);
+        }
+        
+        .gate-info {
+            flex: 1;
+        }
+        
+        .gate-info h3 {
+            margin-bottom: 5px;
+        }
+        
+        .gate-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .serial-log {
+            height: 200px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed #eee;
+        }
+        
+        .log-entry.plate-detected {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .log-entry.wrong-parking {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+        
+        .log-entry.gate-status {
+            color: var(--tertiary-color);
+        }
+        
+        .alert {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            color: white;
+        }
+        
+        .alert-success {
+            background-color: var(--secondary-color);
+        }
+        
+        .alert-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .alert-warning {
+            background-color: var(--tertiary-color);
+        }
+        
+        .tab-container {
+            margin-bottom: 15px;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        
+        .tab-btn {
+            padding: 10px 15px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--gray-color);
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .statistics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: var(--primary-color);
+        }
+        
+        .stat-label {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+        
+        .recent-events {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .event-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .event-info {
+            flex: 1;
+        }
+        
+        .event-type {
+            font-weight: 500;
+        }
+        
+        .event-data {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+            margin-top: 3px;
+        }
+        
+        .event-time {
+            color: var(--gray-color);
+            font-size: 0.8rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+        
+        /* Animation for gate */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .gate-open {
+            animation: pulse 1.5s infinite;
+        }
+        
+        /* Additional styling for camera feed */
+        .camera-feed {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        .camera-feed img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        
+        .camera-placeholder {
+            width: 100%;
+            height: 200px;
+            background-color: #f5f5f5;
+            border: 1px dashed #ddd;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-color);
+        }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            animation: slideIn 0.3s ease-out forwards;
+            max-width: 300px;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .toast-icon {
+            font-size: 1.2rem;
+        }
+        
+        .toast-success .toast-icon {
+            color: var(--secondary-color);
+        }
+        
+        .toast-warning .toast-icon {
+            color: var(--tertiary-color);
+        }
+        
+        .toast-danger .toast-icon {
+            color: var(--danger-color);
+        }
+        
+        .toast-content {
+            flex: 1;
+        }
+        
+        .toast-title {
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        
+        .toast-message {
+            font-size: 0.9rem;
+            color: var(--gray-color);
+        }
+        
+        .toast-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--gray-color);
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toastContainer">
+        <!-- Toast notifications will be added here -->
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-parking"></i>
+                <h1>Smart Parking System</h1>
+            </div>
+            <div class="status-indicator">
+                <div class="indicator online" id="connectionStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>Connected</span>
+                </div>
+                <div class="indicator" id="wifiStatus">
+                    <i class="fas fa-wifi"></i>
+                    <span>WiFi</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="statistics">
+            <div class="stat-card">
+                <div class="stat-label">Available Slots</div>
+                <div class="stat-value" id="availableSlots">--</div>
+                <div class="stat-label">Total: 2</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Vehicles Today</div>
+                <div class="stat-value" id="vehiclesCount">--</div>
+                <div class="stat-label">Since midnight</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Gate Status</div>
+                <div class="stat-value" id="gateStatusIndicator">--</div>
+                <div class="stat-label" id="gateStatusTime">Last changed: --</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <div class="title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Parking Slots</span>
+                    </div>
+                    <button class="btn btn-sm" id="refreshSlotsBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="slot-container">
+                        <div class="slot free" id="slot1">
+                            <div class="slot-number">1</div>
+                            <div class="slot-status">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Available</span>
+                            </div>
+                            <div class="slot-plate" id="slot1Plate">--</div>
+                            <div class="controls">
+                                <button class="btn btn-sm btn-warning bookBtn" data-slot="1">Book</button>
+                                <button class="btn btn-sm btn-danger cancelBtn" data-slot="1" style="display: none;">Cancel</button>
+                            </div>
+                        </div>
+                        <div class="slot free" id="slot2">
+                            <div class="slot-number">2</div>
+                            <div class="slot-status">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Available</span>
+                            </div>
+                            <div class="slot-plate" id="slot2Plate">--</div>
+                            <div class="controls">
+                                <button class="btn btn-sm btn-warning bookBtn" data-slot="2">Book</button>
+                                <button class="btn btn-sm btn-danger cancelBtn" data-slot="2" style="display: none;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="title">
+                        <i class="fas fa-door-open"></i>
+                        <span>Gate Control</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="gate-status">
+                        <div class="gate-indicator gate-closed" id="gateIndicator">
+                            <i class="fas fa-door-closed" id="gateIcon"></i>
+                        </div>
+                        <div class="gate-info">
+                            <h3 id="gateStatusText">Gate Closed</h3>
+                            <p id="gateMessage">No vehicle detected at entrance</p>
+                            <div class="gate-actions">
+                                <button class="btn btn-success" id="openGateBtn">Open Gate</button>
+                                <button class="btn btn-danger" id="closeGateBtn">Close Gate</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-feed">
+                        <img src="https://www.circuitdigest.cloud/static/YOURAPIKEY.jpeg"> <!-- Replace YOURAPIKEY with your actual API key -->
+                             id="cameraFeed" 
+                             alt="Camera Feed"
+                             style="width: 100%; max-width: 100%; border-radius: 8px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="title">
+                        <i class="fas fa-history"></i>
+                        <span>System Logs</span>
+                    </div>
+                    <button class="btn btn-sm" id="clearLogsBtn">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="tab-container">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" data-tab="serialLogs">Serial Logs</button>
+                            <button class="tab-btn" data-tab="systemLogs">System Events</button>
+                            <button class="tab-btn" data-tab="plateDetections">Plate Detections</button>
+                        </div>
+                        
+                        <div class="tab-content active" id="serialLogs">
+                            <div class="serial-log" id="serialLogContainer">
+                                <div class="log-entry">Waiting for serial communication...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-content" id="systemLogs">
+                            <div class="recent-events" id="systemEventsContainer">
+                                <div class="event-item">
+                                    <div class="event-info">
+                                        <div class="event-type">System Started</div>
+                                        <div class="event-data">Application initialized</div>
+                                    </div>
+                                    <div class="event-time">Just now</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-content" id="plateDetections">
+                            <div class="recent-events" id="plateDetectionsContainer">
+                                <div class="event-item">
+                                    <div class="event-info">
+                                        <div class="event-type">No plates detected yet</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="title">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>System Control</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="commandInput">Send Command to Arduino:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" id="commandInput" placeholder="Enter command...">
+                            <button class="btn btn-primary" id="sendCommandBtn">Send</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label for="buzzerDuration">Buzzer Duration (ms):</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" class="form-control" id="buzzerDuration" value="1000" min="100" max="5000">
+                                <button class="btn btn-warning" id="activateBuzzerBtn">Buzz</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="ledToggle">Toggle LED:</label>
+                            <div style="display: flex; gap: 10px;">
+                                <select class="form-control" id="ledToggle">
+                                    <option value="20">Slot 1 - Red LED</option>
+                                    <option value="2">Slot 1 - Green LED</option>
+                                    <option value="35">Slot 2 - Red LED</option>
+                                    <option value="36">Slot 2 - Green LED</option>
+                                </select>
+                                <button class="btn" id="toggleLedBtn">Toggle</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button class="btn btn-primary" id="getStatusBtn">
+                            <i class="fas fa-sync-alt"></i> Get System Status
+                        </button>
+                        <button class="btn btn-danger" id="resetArduinoBtn">
+                            <i class="fas fa-power-off"></i> Reset Arduino
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" style="display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+        <div style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 500px;">
+            <h3>Book Parking Slot <span id="bookingSlotNumber"></span></h3>
+            <div class="form-group">
+                <label for="licensePlateInput">License Plate Number:</label>
+                <input type="text" class="form-control" id="licensePlateInput" placeholder="Enter license plate...">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button class="btn" id="cancelBookingModalBtn">Cancel</button>
+                <button class="btn btn-success" id="confirmBookingBtn">Book Slot</button>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        Smart Parking System © 2025 | Edge Device: <span id="edgeDeviceStatus">Connected</span>
+    </footer>
+
+    <script>
+        // Global variables
+        let systemStatus = {
+            gate_open: false,
+            available_slots: 2,
+            wifi_connected: false,
+            timestamp: null
+        };
+        
+        let slotsStatus = [
+            {id: 1, booked: false, occupied: false, plate: null},
+            {id: 2, booked: false, occupied: false, plate: null}
+        ];
+        
+        let serialMessages = [];
+        let systemEvents = [];
+        let plateDetections = [];
+        let vehiclesCount = 0;
+        
+        // DOM Elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const wifiStatus = document.getElementById('wifiStatus');
+        const availableSlots = document.getElementById('availableSlots');
+        const vehiclesCountEl = document.getElementById('vehiclesCount');
+        const gateStatusIndicator = document.getElementById('gateStatusIndicator');
+        const gateStatusTime = document.getElementById('gateStatusTime');
+        const gateIndicator = document.getElementById('gateIndicator');
+        const gateIcon = document.getElementById('gateIcon');
+        const gateStatusText = document.getElementById('gateStatusText');
+        const gateMessage = document.getElementById('gateMessage');
+        const serialLogContainer = document.getElementById('serialLogContainer');
+        const systemEventsContainer = document.getElementById('systemEventsContainer');
+        const plateDetectionsContainer = document.getElementById('plateDetectionsContainer');
+        const slot1 = document.getElementById('slot1');
+        const slot2 = document.getElementById('slot2');
+        const slot1Plate = document.getElementById('slot1Plate');
+        const slot2Plate = document.getElementById('slot2Plate');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const bookingModal = document.getElementById('bookingModal');
+        const bookingSlotNumber = document.getElementById('bookingSlotNumber');
+        const licensePlateInput = document.getElementById('licensePlateInput');
+        const edgeDeviceStatus = document.getElementById('edgeDeviceStatus');
+        
+        // Buttons
+        const refreshSlotsBtn = document.getElementById('refreshSlotsBtn');
+        const openGateBtn = document.getElementById('openGateBtn');
+        const closeGateBtn = document.getElementById('closeGateBtn');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+        const sendCommandBtn = document.getElementById('sendCommandBtn');
+        const activateBuzzerBtn = document.getElementById('activateBuzzerBtn');
+        const toggleLedBtn = document.getElementById('toggleLedBtn');
+        const getStatusBtn = document.getElementById('getStatusBtn');
+        const resetArduinoBtn = document.getElementById('resetArduinoBtn');
+        const bookBtns = document.querySelectorAll('.bookBtn');
+        const cancelBtns = document.querySelectorAll('.cancelBtn');
+        const cancelBookingModalBtn = document.getElementById('cancelBookingModalBtn');
+        const confirmBookingBtn = document.getElementById('confirmBookingBtn');
+        
+        // Inputs
+        const commandInput = document.getElementById('commandInput');
+        const buzzerDuration = document.getElementById('buzzerDuration');
+        const ledToggle = document.getElementById('ledToggle');
+        
+        // Tab buttons
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        
+        // Functions
+        function updateSystemStatus() {
+            // Update connection status
+            if (systemStatus.wifi_connected) {
+                wifiStatus.classList.add('online');
+                wifiStatus.classList.remove('offline');
+            } else {
+                wifiStatus.classList.remove('online');
+                wifiStatus.classList.add('offline');
+            }
+            
+            // Update available slots
+            availableSlots.textContent = systemStatus.available_slots;
+            
+            // Update gate status
+            if (systemStatus.gate_open) {
+                gateStatusIndicator.textContent = 'OPEN';
+                gateIndicator.classList.add('gate-open');
+                gateIndicator.classList.remove('gate-closed');
+                gateIcon.className = 'fas fa-door-open';
+                gateStatusText.textContent = 'Gate Open';
+                gateMessage.textContent = 'Gate will automatically close after timeout';
+            } else {
+                gateStatusIndicator.textContent = 'CLOSED';
+                gateIndicator.classList.remove('gate-open');
+                gateIndicator.classList.add('gate-closed');
+                gateIcon.className = 'fas fa-door-closed';
+                gateStatusText.textContent = 'Gate Closed';
+                gateMessage.textContent = 'No vehicle detected at entrance';
+            }
+            
+            // Update gate status time
+            if (systemStatus.timestamp) {
+                const date = new Date(systemStatus.timestamp);
+                gateStatusTime.textContent = `Last changed: ${date.toLocaleTimeString()}`;
+            }
+        }
+        
+        function updateSlotsStatus() {
+            // Update slot 1
+            updateSlotUI(slot1, slot1Plate, slotsStatus[0]);
+            
+            // Update slot 2
+            updateSlotUI(slot2, slot2Plate, slotsStatus[1]);
+        }
+        
+        function updateSlotUI(slotElement, plateElement, slotStatus) {
+            // Remove all status classes
+            slotElement.classList.remove('free', 'occupied', 'booked');
+        
+            const isBooked = slotStatus.status === 'booked';
+            const isOccupied = slotStatus.status === 'occupied'; // if you're using this
+        
+            if (isBooked && isOccupied) {
+                slotElement.classList.add('booked');
+                slotElement.querySelector('.slot-status').innerHTML = '<i class="fas fa-car"></i><span>Occupied</span>';
+                slotElement.querySelector('.bookBtn').style.display = 'none';
+                slotElement.querySelector('.cancelBtn').style.display = 'none';
+            } else if (isBooked) {
+                slotElement.classList.add('booked');
+                slotElement.querySelector('.slot-status').innerHTML = '<i class="fas fa-bookmark"></i><span>Booked</span>';
+                slotElement.querySelector('.bookBtn').style.display = 'none';
+                slotElement.querySelector('.cancelBtn').style.display = 'inline-block';
+            } else if (isOccupied) {
+                slotElement.classList.add('occupied');
+                slotElement.querySelector('.slot-status').innerHTML = '<i class="fas fa-car"></i><span>Occupied</span>';
+                slotElement.querySelector('.bookBtn').style.display = 'none';
+                slotElement.querySelector('.cancelBtn').style.display = 'none';
+            } else {
+                slotElement.classList.add('free');
+                slotElement.querySelector('.slot-status').innerHTML = '<i class="fas fa-check-circle"></i><span>Available</span>';
+                slotElement.querySelector('.bookBtn').style.display = 'inline-block';
+                slotElement.querySelector('.cancelBtn').style.display = 'none';
+            }
+        
+            plateElement.textContent = slotStatus.plate || '--';
+        }        
+        
+        function addSerialLog(message) {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            // Add specific classes based on message content
+            if (message.includes('PLATE_DETECTED') || message.includes('DETECTED_PLATE')) {
+                logEntry.classList.add('plate-detected');
+            } else if (message.includes('WRONG_PARKING')) {
+                logEntry.classList.add('wrong-parking');
+            } else if (message.includes('GATE_STATUS')) {
+                logEntry.classList.add('gate-status');
+            }
+            
+            logEntry.textContent = message;
+            serialLogContainer.appendChild(logEntry);
+            serialLogContainer.scrollTop = serialLogContainer.scrollHeight;
+            
+            // Keep only the latest 100 messages
+            if (serialLogContainer.children.length > 100) {
+                serialLogContainer.removeChild(serialLogContainer.children[0]);
+            }
+        }
+        
+        function addSystemEvent(eventType, eventData) {
+            const eventItem = document.createElement('div');
+            eventItem.className = 'event-item';
+            
+            const eventInfo = document.createElement('div');
+            eventInfo.className = 'event-info';
+            
+            const eventTypeEl = document.createElement('div');
+            eventTypeEl.className = 'event-type';
+            eventTypeEl.textContent = eventType;
+            
+            const eventDataEl = document.createElement('div');
+            eventDataEl.className = 'event-data';
+            eventDataEl.textContent = eventData || '';
+            
+            const eventTime = document.createElement('div');
+            eventTime.className = 'event-time';
+            
+            const now = new Date();
+            eventTime.textContent = now.toLocaleTimeString();
+            
+            eventInfo.appendChild(eventTypeEl);
+            if (eventData) {
+                eventInfo.appendChild(eventDataEl);
+            }
+            
+            eventItem.appendChild(eventInfo);
+            eventItem.appendChild(eventTime);
+            
+            systemEventsContainer.insertBefore(eventItem, systemEventsContainer.firstChild);
+            
+            // Keep only the latest 50 events
+            if (systemEventsContainer.children.length > 50) {
+                systemEventsContainer.removeChild(systemEventsContainer.lastChild);
+            }
+        }
+        
+        function addPlateDetection(plateNumber, slotAssigned) {
+            const eventItem = document.createElement('div');
+            eventItem.className = 'event-item';
+            
+            const eventInfo = document.createElement('div');
+            eventInfo.className = 'event-info';
+            
+            const eventTypeEl = document.createElement('div');
+            eventTypeEl.className = 'event-type';
+            eventTypeEl.textContent = `Plate: ${plateNumber}`;
+            
+            const eventDataEl = document.createElement('div');
+            eventDataEl.className = 'event-data';
+            eventDataEl.textContent = slotAssigned ? `Assigned to slot ${slotAssigned}` : 'No slot assigned';
+            
+            const eventTime = document.createElement('div');
+            eventTime.className = 'event-time';
+            
+            const now = new Date();
+            eventTime.textContent = now.toLocaleTimeString();
+            
+            eventInfo.appendChild(eventTypeEl);
+            eventInfo.appendChild(eventDataEl);
+            
+            eventItem.appendChild(eventInfo);
+            eventItem.appendChild(eventTime);
+            
+            plateDetectionsContainer.insertBefore(eventItem, plateDetectionsContainer.firstChild);
+            
+            // Keep only the latest 20 detections
+            if (plateDetectionsContainer.children.length > 20) {
+                plateDetectionsContainer.removeChild(plateDetectionsContainer.lastChild);
+            }
+            
+            // Update vehicle count
+            vehiclesCount++;
+            vehiclesCountEl.textContent = vehiclesCount;
+        }
+        
+        function showToast(type, title, message) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            let iconClass = '';
+            switch (type) {
+                case 'success':
+                    iconClass = 'fas fa-check-circle';
+                    break;
+                case 'warning':
+                    iconClass = 'fas fa-exclamation-triangle';
+                    break;
+                case 'danger':
+                    iconClass = 'fas fa-times-circle';
+                    break;
+                default:
+                    iconClass = 'fas fa-info-circle';
+            }
+            
+            toast.innerHTML = `
+                <div class="toast-icon">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            // Add to container
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            // Add close event listener
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                toast.remove();
+            });
+            
+            // Auto remove after 4 seconds
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 4000);
+        }
+        
+        // API Calls
+        async function fetchSystemStatus() {
+            try {
+                const response = await fetch('/api/system_status');
+                const data = await response.json();
+                
+                // Update global state
+                systemStatus = data.system;
+                slotsStatus = data.slots;
+                
+                // Update UI
+                updateSystemStatus();
+                updateSlotsStatus();
+                
+                // Show online status
+                connectionStatus.classList.add('online');
+                connectionStatus.classList.remove('offline');
+                connectionStatus.innerHTML = '<i class="fas fa-circle"></i><span>Connected</span>';
+                edgeDeviceStatus.textContent = 'Connected';
+                
+            } catch (error) {
+                console.error('Error fetching system status:', error);
+                
+                // Show offline status
+                connectionStatus.classList.remove('online');
+                connectionStatus.classList.add('offline');
+                connectionStatus.innerHTML = '<i class="fas fa-circle"></i><span>Disconnected</span>';
+                edgeDeviceStatus.textContent = 'Disconnected';
+                
+                showToast('danger', 'Connection Error', 'Failed to connect to the server. Please check your connection.');
+            }
+        }
+        
+        async function fetchSerialMessages() {
+            try {
+                const response = await fetch('/api/serial_messages');
+                const messages = await response.json();
+                
+                // Process only new messages
+                if (serialMessages.length === 0) {
+                    // First load - show last 20 messages
+                    const lastMessages = messages.slice(-20);
+                    serialLogContainer.innerHTML = ''; // Clear placeholder
+                    
+                    for (const message of lastMessages) {
+                        addSerialLog(message);
+                    }
+                } else {
+                    // Check for new messages
+                    const newMessages = messages.slice(serialMessages.length);
+                    for (const message of newMessages) {
+                        addSerialLog(message);
+                        
+                        // Check for specific messages to update UI
+                        if (message.includes('DETECTED_PLATE:')) {
+                            const plate = message.split(':')[1];
+                            addPlateDetection(plate);
+                            showToast('warning', 'Plate Detected', `License plate detected: ${plate}`);
+                        }
+                        
+                        if (message.includes('SLOT_ASSIGNED:')) {
+                            const parts = message.split(':');
+                            const slotType = parts[1];
+                            const slotNum = parts[2];
+                            
+                            addSystemEvent('Slot Assigned', `${slotType} slot ${slotNum} assigned`);
+                        }
+                        
+                        if (message.includes('GATE_STATUS:')) {
+                            const status = message.split(':')[1];
+                            addSystemEvent('Gate Status', status);
+                            
+                            if (status === 'OPENED') {
+                                showToast('success', 'Gate Opened', 'The entrance gate has been opened');
+                            } else if (status === 'CLOSED') {
+                                showToast('warning', 'Gate Closed', 'The entrance gate has been closed');
+                            }
+                        }
+                        
+                        if (message.includes('WRONG_PARKING:')) {
+                            const slot = message.split(':')[1];
+                            addSystemEvent('Wrong Parking', `Vehicle in wrong slot: ${slot}`);
+                            showToast('danger', 'Wrong Parking', `A vehicle is in the wrong parking slot: ${slot}`);
+                        }
+                    }
+                }
+                
+                serialMessages = messages;
+            } catch (error) {
+                console.error('Error fetching serial messages:', error);
+            }
+        }
+        
+        async function openGate() {
+            try {
+                const response = await fetch('/arduino/open_gate');
+                showToast('success', 'Command Sent', 'Open gate command sent to Arduino');
+            } catch (error) {
+                console.error('Error opening gate:', error);
+                showToast('danger', 'Command Failed', 'Failed to send open gate command');
+            }
+        }
+        
+        async function closeGate() {
+            try {
+                const response = await fetch('/arduino/close_gate');
+                showToast('success', 'Command Sent', 'Close gate command sent to Arduino');
+            } catch (error) {
+                console.error('Error closing gate:', error);
+                showToast('danger', 'Command Failed', 'Failed to send close gate command');
+            }
+        }
+        
+        async function sendCommand(command) {
+            try {
+                const formData = new FormData();
+                formData.append('command', command);
+                
+                const response = await fetch('/api/send_command', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('success', 'Command Sent', `Command "${command}" sent successfully`);
+                } else {
+                    showToast('danger', 'Command Failed', result.message || 'Failed to send command');
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+                showToast('danger', 'Command Failed', 'Failed to send command');
+            }
+        }
+        
+        async function toggleLed(pin) {
+            try {
+                const formData = new FormData();
+                formData.append('pin', pin);
+                
+                const response = await fetch('/arduino/toggle_led', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                showToast('success', 'LED Toggled', `LED on pin ${pin} toggled`);
+            } catch (error) {
+                console.error('Error toggling LED:', error);
+                showToast('danger', 'Command Failed', 'Failed to toggle LED');
+            }
+        }
+        
+        async function activateBuzzer(duration) {
+            try {
+                const formData = new FormData();
+                formData.append('duration', duration);
+                
+                const response = await fetch('/arduino/buzzer', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                showToast('success', 'Buzzer Activated', `Buzzer activated for ${duration}ms`);
+            } catch (error) {
+                console.error('Error activating buzzer:', error);
+                showToast('danger', 'Command Failed', 'Failed to activate buzzer');
+            }
+        }
+        
+        async function getArduinoStatus() {
+            try {
+                const response = await fetch('/arduino/get_status');
+                showToast('success', 'Status Requested', 'Status update requested from Arduino');
+            } catch (error) {
+                console.error('Error requesting status:', error);
+                showToast('danger', 'Command Failed', 'Failed to request status from Arduino');
+            }
+        }
+        
+        async function resetArduino() {
+            if (confirm('Are you sure you want to reset the Arduino?')) {
+                try {
+                    const response = await fetch('/arduino/reset');
+                    showToast('success', 'Reset Command Sent', 'Reset command sent to Arduino');
+                } catch (error) {
+                    console.error('Error resetting Arduino:', error);
+                    showToast('danger', 'Command Failed', 'Failed to reset Arduino');
+                }
+            }
+        }
+        
+        async function bookSlot(slotId, plateNumber) {
+            try {
+                const formData = new FormData();
+                formData.append('slot_id', slotId);
+                formData.append('plate_number', plateNumber);
+                
+                const response = await fetch('/book_slot', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Refresh data after booking
+                fetchSystemStatus();
+                
+                showToast('success', 'Slot Booked', `Slot ${slotId} booked for plate ${plateNumber}`);
+            } catch (error) {
+                console.error('Error booking slot:', error);
+                showToast('danger', 'Booking Failed', 'Failed to book slot');
+            }
+        }
+        
+        async function cancelBooking(slotId) {
+            try {
+                const formData = new FormData();
+                formData.append('slot_id', slotId);
+                
+                const response = await fetch('/cancel_booking', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Refresh data after cancellation
+                fetchSystemStatus();
+                
+                showToast('success', 'Booking Cancelled', `Booking for slot ${slotId} has been cancelled`);
+            } catch (error) {
+                console.error('Error cancelling booking:', error);
+                showToast('danger', 'Cancellation Failed', 'Failed to cancel booking');
+            }
+        }
+        
+        // Event Listeners
+        refreshSlotsBtn.addEventListener('click', fetchSystemStatus);
+        
+        openGateBtn.addEventListener('click', openGate);
+        
+        closeGateBtn.addEventListener('click', closeGate);
+        
+        clearLogsBtn.addEventListener('click', () => {
+            serialLogContainer.innerHTML = '';
+            serialMessages = [];
+        });
+        
+        sendCommandBtn.addEventListener('click', () => {
+            const command = commandInput.value.trim();
+            if (command) {
+                sendCommand(command);
+                commandInput.value = '';
+            }
+        });
+        
+        activateBuzzerBtn.addEventListener('click', () => {
+            const duration = buzzerDuration.value;
+            activateBuzzer(duration);
+        });
+        
+        toggleLedBtn.addEventListener('click', () => {
+            const pin = ledToggle.value;
+            toggleLed(pin);
+        });
+        
+        getStatusBtn.addEventListener('click', getArduinoStatus);
+        
+        resetArduinoBtn.addEventListener('click', resetArduino);
+        
+        // Book slot buttons
+        bookBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const slotId = btn.dataset.slot;
+                bookingSlotNumber.textContent = slotId;
+                bookingModal.style.display = 'block';
+            });
+        });
+        
+        // Cancel booking buttons
+        cancelBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const slotId = btn.dataset.slot;
+                if (confirm(`Are you sure you want to cancel booking for slot ${slotId}?`)) {
+                    cancelBooking(slotId);
+                }
+            });
+        });
+        
+        // Booking modal buttons
+        cancelBookingModalBtn.addEventListener('click', () => {
+            bookingModal.style.display = 'none';
+            licensePlateInput.value = '';
+        });
+        
+        confirmBookingBtn.addEventListener('click', () => {
+            const slotId = bookingSlotNumber.textContent;
+            const plateNumber = licensePlateInput.value.trim();
+            
+            if (plateNumber) {
+                bookSlot(slotId, plateNumber);
+                bookingModal.style.display = 'none';
+                licensePlateInput.value = '';
+            } else {
+                alert('Please enter a license plate number');
+            }
+        });
+        
+        // Tab buttons
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and contents
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding content
+                button.classList.add('active');
+                document.getElementById(button.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Enter key in command input
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendCommandBtn.click();
+            }
+        });
+        
+        // Escape key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && bookingModal.style.display === 'block') {
+                bookingModal.style.display = 'none';
+            }
+        });
+        
+        // Click outside modal to close
+        window.addEventListener('click', (e) => {
+            if (e.target === bookingModal) {
+                bookingModal.style.display = 'none';
+            }
+        });
+        
+        // Poll for updates
+        function startPolling() {
+            // Initial load
+            fetchSystemStatus();
+            fetchSerialMessages();
+            
+            // Set up polling intervals
+            setInterval(fetchSystemStatus, 5000);  // Update status every 5 seconds
+            setInterval(fetchSerialMessages, 1000); // Check for new messages every second
+        }
+        
+        // Initialize the application
+        window.addEventListener('load', startPolling);
+    </script>
+</body>
+</html>
