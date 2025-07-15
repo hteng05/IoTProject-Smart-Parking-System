@@ -15,7 +15,7 @@ const char* password = "Your_PASSWORD"; // Replace with your WiFi password
 String serverName = "www.circuitdigest.cloud";
 String serverPath = "/readnumberplate";
 const int serverPort = 443;
-String apiKey = ""; // Your API key for authentication
+String apiKey = "YOURAPIKEY"; // Your API key for authentication
 
 // Initialize secure client for HTTPS API calls
 WiFiClientSecure client;
